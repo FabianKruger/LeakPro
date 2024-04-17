@@ -39,3 +39,15 @@ exclude = [
 
 lint.ignore = [
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "LEAKPRO"
+version = "0.1.0"
+readme = "README.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["leakpro"]
