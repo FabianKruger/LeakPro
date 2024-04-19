@@ -3,13 +3,16 @@ import logging
 
 import numpy as np
 import torch
+import lightning as L
 
+from typing import Type
 from leakpro.dataset import GeneralDataset
 from leakpro.import_helper import Any, Dict, Self
 from leakpro.mia_attacks.attack_factory import AttackFactory
 from leakpro.mia_attacks.attack_objects import AttackObjects
 from leakpro.mia_attacks.attack_utils import AttackUtils
 from leakpro.mia_attacks.attacks.attack import AttackAbstract
+from leakpro.adapters.custom_data_module import CustomDataModule
 
 
 class AttackScheduler:
@@ -17,10 +20,9 @@ class AttackScheduler:
 
     def __init__(  # noqa: D107, PLR0913
         self:Self,
-        population:GeneralDataset,
-        train_test_dataset:np.ndarray,
-        target_model:torch.nn.Module,
-        target_model_metadata:Dict[str, Any],  # noqa: ARG002
+        data_module: CustomDataModule,
+        model_class: Type[L.LightningModule],
+        target_model:L.LightningModule,
         configs:Dict[str, Any],
         logs_dirname:str,
         logger:logging.Logger
@@ -29,7 +31,7 @@ class AttackScheduler:
         self.attacks = []
 
         attack_objects = AttackObjects(
-            population, train_test_dataset, target_model, configs, logger
+            data_module=data_module, target_model_class=model_class, trained_target_model=target_model, configs=configs, logger=logger
         )
         attack_utils = AttackUtils(attack_objects)
 
