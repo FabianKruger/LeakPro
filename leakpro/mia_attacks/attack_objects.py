@@ -109,7 +109,7 @@ class AttackObjects:
 
 
     @property
-    def shadow_models(self: Self) -> List[Model]:
+    def shadow_models(self: Self) -> List[L.LightningModule]:
         """Return the shadow models.
 
         Returns
