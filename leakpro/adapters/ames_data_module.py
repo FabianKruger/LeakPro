@@ -1,4 +1,4 @@
-from torch.utils.data import Dataset, DataLoader, TensorDataset
+from torch.utils.data import Dataset, DataLoader, TensorDataset, ConcatDataset
 from typing import Literal, Optional
 from pathlib import Path
 import pandas as pd
@@ -18,7 +18,6 @@ class AmesDataModule(CustomDataModule):
         self.train_dataset: Optional[Dataset] = None
         self.validation_dataset: Optional[Dataset] = None
         self.test_dataset: Optional[Dataset] = None
-        self.population_data: Optional[Dataset] = None
         self.input_vec_dim: int = 0
 
         # TODO: check if this can be moved to setup
@@ -52,7 +51,6 @@ class AmesDataModule(CustomDataModule):
                 validation_data = subset.iloc[split_point:]
                 self.train_dataset = self.convert_dataset(train_data)
                 self.validation_dataset = self.convert_dataset(validation_data)
-
 
         if stage == "test":
             if self.usecase == "target":
@@ -136,4 +134,26 @@ class AmesDataModule(CustomDataModule):
             num_workers=self.datamodule_configs["num_workers"],
             prefetch_factor=self.datamodule_configs["prefetch_factor"],
             collate_fn=collate_function,
+        )
+
+
+    def population_dataloader(self) -> DataLoader:
+        # create all datasets
+        train_target_dataset = self.convert_dataset(pd.read_csv(self.datamodule_configs["file_paths"]["train"]))
+        val_target_dataset = self.convert_dataset(pd.read_csv(self.datamodule_configs["file_paths"]["validation"])) # TODO: should include?
+        test_target_dataset = self.convert_dataset(pd.read_csv(self.datamodule_configs["file_paths"]["test"]))
+        aux_dataset = self.convert_dataset(pd.read_csv(self.datamodule_configs["file_paths"]["population"]))
+        datasets = [train_target_dataset, val_target_dataset, test_target_dataset, aux_dataset]
+        overall_dataset = ConcatDataset(datasets)
+        if self.datamodule_configs["representation"] == "graph":
+            collate_function = mol_collate_fn
+        else:
+            collate_function = None
+        return DataLoader(
+            overall_dataset,
+            batch_size=1, # TODO: for now only one, later adapt to higher for more efficient evaluation
+            shuffle=True,
+            num_workers=self.datamodule_configs["num_workers"],
+            prefetch_factor=self.datamodule_configs["prefetch_factor"],
+            collate_fn=collate_function,           
         )
