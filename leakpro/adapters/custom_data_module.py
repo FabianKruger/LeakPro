@@ -37,6 +37,10 @@ class CustomDataModule(L.LightningDataModule, ABC):
     def test_dataloader(self) -> DataLoader:
         pass
 
+    @abstractmethod
+    def population_dataloader(self) -> DataLoader:
+        pass
+
     # @property
     # @abstractmethod
     # def population(self) -> Dataset:
