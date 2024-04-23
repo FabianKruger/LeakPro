@@ -114,7 +114,7 @@ class AttackObjects:
 
         Returns
         -------
-        List[Model]: The shadow models.
+        List[L.LightningModule]: The shadow models.
 
         """
         return self._shadow_models
