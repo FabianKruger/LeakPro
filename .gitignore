@@ -161,3 +161,6 @@ cython_debug/
 
 # mac generated files
 .DS_Store
+
+# trained models
+/trained_models/
