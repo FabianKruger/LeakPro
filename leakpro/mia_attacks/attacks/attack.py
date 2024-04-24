@@ -28,34 +28,34 @@ class AttackAbstract(ABC):
             attack_utils (AttackUtils): An instance of the AttackUtils class containing the attack objects.
 
         """
-        self.population = attack_utils.attack_objects.population
-        self.population_size = attack_utils.attack_objects.population_size
+        # self.population = attack_utils.attack_objects.population
+        # self.population_size = attack_utils.attack_objects.population_size
         self.target_model = attack_utils.attack_objects.target_model
-        self.audit_dataset = attack_utils.attack_objects.audit_dataset
+        # self.audit_dataset = attack_utils.attack_objects.audit_dataset
         self.signal_data = []
 
 
-    @property
-    def get_population(self:Self)-> List:
-        """Get the population used for the attack.
+    # @property
+    # def get_population(self:Self)-> List:
+    #     """Get the population used for the attack.
 
-        Returns
-        -------
-        List: The population used for the attack.
+    #     Returns
+    #     -------
+    #     List: The population used for the attack.
 
-        """
-        return self.population
+    #     """
+    #     return self.population
 
-    @property
-    def get_population_size(self:Self)-> int:
-        """Get the size of the population used for the attack.
+    # @property
+    # def get_population_size(self:Self)-> int:
+    #     """Get the size of the population used for the attack.
 
-        Returns
-        -------
-        int: The size of the population used for the attack.
+    #     Returns
+    #     -------
+    #     int: The size of the population used for the attack.
 
-        """
-        return self.population_size
+    #     """
+    #     return self.population_size
 
     @property
     def get_target_model(self:Self)-> Union[Self, List[Self] ]:
@@ -68,16 +68,16 @@ class AttackAbstract(ABC):
         """
         return self.target_model
 
-    @property
-    def get_audit_dataset(self:Self)-> Self:
-        """Get the audit dataset used for the attack.
+    # @property
+    # def get_audit_dataset(self:Self)-> Self:
+    #     """Get the audit dataset used for the attack.
 
-        Returns
-        -------
-        Self: The audit dataset used for the attack.
+    #     Returns
+    #     -------
+    #     Self: The audit dataset used for the attack.
 
-        """
-        return self.audit_dataset
+    #     """
+    #     return self.audit_dataset
 
     @abstractmethod
     def description(self:Self) -> dict:
