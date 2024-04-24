@@ -132,7 +132,10 @@ class AttackRMIA(AttackAbstract):
             temp = []
             for shadow_model in self.shadow_models:
                 with torch.no_grad():
-                    logit = shadow_model.forward(z.to(shadow_model.device))
+                    if isinstance(z, torch.Tensor):
+                        logit = shadow_model.forward(z.to(shadow_model.device))
+                    else:
+                        logit = shadow_model.forward(z)
                     p_z_shadow_model = self.get_probability_from_model_output(logit, y)
                     temp.append(p_z_shadow_model)
             p_z_given_different_thetas_list.append(temp)
@@ -151,7 +154,10 @@ class AttackRMIA(AttackAbstract):
 
         for z, y in iter(population_dataloader):
             with torch.no_grad():
-                logit = self.target_model.forward(z.to(self.target_model.device))
+                if isinstance(z, torch.Tensor):
+                    logit = self.target_model.forward(z.to(self.target_model.device))
+                else:
+                    logit = self.target_model.forward(z)
                 p_z_target_model = self.get_probability_from_model_output(logit, y)
                 p_z_target_model_list.append(p_z_target_model)
 
@@ -226,7 +232,10 @@ class AttackRMIA(AttackAbstract):
             temp = []
             for shadow_model in self.shadow_models:
                 with torch.no_grad():
-                    logit = shadow_model.forward(x.to(shadow_model.device))
+                    if isinstance(x, torch.Tensor):
+                        logit = shadow_model.forward(x.to(shadow_model.device))
+                    else:
+                        logit = shadow_model.forward(x)
                     p_x_shadow_model = self.get_probability_from_model_output(logit, y)
                     temp.append(p_x_shadow_model)
             p_x_given_different_thetas_list_members.append(temp)
@@ -236,7 +245,10 @@ class AttackRMIA(AttackAbstract):
             temp = []
             for shadow_model in self.shadow_models:
                 with torch.no_grad():
-                    logit = shadow_model.forward(x.to(shadow_model.device))
+                    if isinstance(x, torch.Tensor):                
+                        logit = shadow_model.forward(x.to(shadow_model.device))
+                    else:
+                        logit = shadow_model.forward(x)
                     p_x_shadow_model = self.get_probability_from_model_output(logit, y)
                     temp.append(p_x_shadow_model)
             p_x_given_different_thetas_list_no_members.append(temp)
@@ -246,12 +258,18 @@ class AttackRMIA(AttackAbstract):
         p_x_given_target_list_no_members: List[float] = []
         for x, y in iter(member_dataloader):
             with torch.no_grad():
-                logit = self.target_model.forward(x.to(self.target_model.device))
+                if isinstance(x, torch.Tensor):
+                    logit = self.target_model.forward(x.to(self.target_model.device))
+                else:
+                    logit = self.target_model.forward(x)
                 p_x_target_model = self.get_probability_from_model_output(logit, y)
                 p_x_given_target_list_members.append(p_x_target_model)
         for x, y in iter(no_member_dataloader):
             with torch.no_grad():
-                logit = self.target_model.forward(x.to(self.target_model.device))
+                if isinstance(x, torch.Tensor):
+                    logit = self.target_model.forward(x.to(self.target_model.device))
+                else:
+                    logit = self.target_model.forward(x)
                 p_x_target_model = self.get_probability_from_model_output(logit, y)
                 p_x_given_target_list_no_members.append(p_x_target_model)
 
