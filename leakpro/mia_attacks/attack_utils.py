@@ -20,6 +20,7 @@ class AttackUtils:
         self.data_module.usecase = "target"
         self.data_module.datamodule_configs["batch_size"] = 1
         self.train_dataloader = self.data_module.train_dataloader()
+        self.data_module.setup(stage="test")
         self.test_dataloader = self.data_module.test_dataloader()
         self.train_iter = iter(self.train_dataloader)
         self.test_iter = iter(self.test_dataloader)
