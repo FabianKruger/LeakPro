@@ -5,13 +5,10 @@ import random
 import time
 from pathlib import Path
 
-import joblib
 import numpy as np
 import torch
 import yaml
 
-import leakpro.train as util
-from leakpro import dataset, models
 from leakpro.mia_attacks.attack_scheduler import AttackScheduler
 from leakpro.reporting.utils import prepare_priavcy_risk_report
 
@@ -56,7 +53,7 @@ if __name__ == "__main__":
 
     RETRAIN = True
     #args = "./config/adult.yaml"  # noqa: ERA001
-    args = "./config/cifar10.yaml" # noqa: ERA001
+    args = "./config/custom_config.yml" # noqa: ERA001
     with open(args, "rb") as f:
         configs = yaml.safe_load(f)
 
@@ -79,15 +76,19 @@ if __name__ == "__main__":
     # Create the population dataset
 
     data_module = AmesDataModule(configs)
+    data_module.setup(stage="fit")
+    with open(configs["LightningModule"]["hyperparameter_file_path"], "rb") as f:
+        hparams = yaml.safe_load(f)
+    # save for later access
+    configs["LightningModule"]["hparams"] = hparams
+
     if configs["LightningModule"]["model_type"] == "MLP":
         model_class = MLPLightningModel
+        configs["LightningModule"]["hparams"]["input_vec_dim"] = data_module.input_vec_dim
     elif configs["LightningModule"]["model_type"] == "MPNN":
         model_class = MPNNLightning
     else:
         raise ValueError(f"Model type {configs['LightningModule']['model_type']} not supported.")
-    hparams = yaml.safe_load(configs["LightningModule"]["hyperparameter_file_path"])
-    # save for later access
-    configs["LightningModule"]["hparams"] = hparams
     target_model = model_class.load_from_checkpoint(configs["LightningModule"]["target_model_path"])
 
     # ------------------------------------------------
@@ -122,11 +123,10 @@ if __name__ == "__main__":
     report_log = configs["audit"]["report_log"]
     privacy_game = configs["audit"]["privacy_game"]
     n_shadow_models = configs["audit"]["num_shadow_models"]
-    n_attack_data_size = configs["audit"]["f_attack_data_size"]
 
     prepare_priavcy_risk_report(
             log_dir,
             [audit_results["rmia"]["result_object"]],
             configs["audit"],
-            save_path=f"{log_dir}/{report_log}/{privacy_game}/ns_{n_shadow_models}_fs_{n_attack_data_size}",
+            save_path=f"{log_dir}/{report_log}/{privacy_game}/ns_{n_shadow_models}",
         )
