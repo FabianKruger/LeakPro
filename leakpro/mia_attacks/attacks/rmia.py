@@ -33,8 +33,8 @@ class AttackRMIA(AttackAbstract):
         self.data_module = attack_utils.data_module
         self.method = "offline" # TODO: add online and make this a config parameter
         # TODO: adapt a and b for different datasets
-        self.offline_a = 0.33 # parameter from which we compute p(x) from p_OUT(x) such that p_IN(x) = a p_OUT(x) + b.
-        self.offline_b: 0.66
+        self.offline_a = 1 # parameter from which we compute p(x) from p_OUT(x) such that p_IN(x) = a p_OUT(x) + b.
+        self.offline_b: 0
         self.gamma = 2.0 # threshold for the attack
         self.temperature = 2.0 # temperature for the softmax
 
@@ -106,7 +106,7 @@ class AttackRMIA(AttackAbstract):
         logit = logit.squeeze()
         label = label.squeeze()
         assert logit.dim() == label.dim(), "In get_probability_from_sigmoid_output the logit and label tensors have different dimensions"
-        if logit.dim() == 1:
+        if logit.dim() == 0:
             y = label.item()
             y_head = F.sigmoid(logit).item()
             probability_for_true_label = y_head if y ==1 else (1-y_head)
@@ -132,7 +132,7 @@ class AttackRMIA(AttackAbstract):
             temp = []
             for shadow_model in self.shadow_models:
                 with torch.no_grad():
-                    logit = shadow_model.forward(z)
+                    logit = shadow_model.forward(z.to(shadow_model.device))
                     p_z_shadow_model = self.get_probability_from_model_output(logit, y)
                     temp.append(p_z_shadow_model)
             p_z_given_different_thetas_list.append(temp)
@@ -141,6 +141,8 @@ class AttackRMIA(AttackAbstract):
         # get P(z) by taking the average of it (casting float to make type checker happy)
         p_z = np.mean(np.array(p_z_given_different_thetas_list), axis=1)
 
+
+        # very weird probability shift here. TODO: See if it is more realistic after actually determening a and b
         if self.method == "offline":
             p_z = 0.5*((self.offline_a + 1) * p_z + (1-self.offline_a))
 
@@ -149,7 +151,7 @@ class AttackRMIA(AttackAbstract):
 
         for z, y in iter(population_dataloader):
             with torch.no_grad():
-                logit = self.target_model.forward(z)
+                logit = self.target_model.forward(z.to(self.target_model.device))
                 p_z_target_model = self.get_probability_from_model_output(logit, y)
                 p_z_target_model_list.append(p_z_target_model)
 
@@ -224,7 +226,7 @@ class AttackRMIA(AttackAbstract):
             temp = []
             for shadow_model in self.shadow_models:
                 with torch.no_grad():
-                    logit = shadow_model.forward(x)
+                    logit = shadow_model.forward(x.to(shadow_model.device))
                     p_x_shadow_model = self.get_probability_from_model_output(logit, y)
                     temp.append(p_x_shadow_model)
             p_x_given_different_thetas_list_members.append(temp)
@@ -234,7 +236,7 @@ class AttackRMIA(AttackAbstract):
             temp = []
             for shadow_model in self.shadow_models:
                 with torch.no_grad():
-                    logit = shadow_model.forward(x)
+                    logit = shadow_model.forward(x.to(shadow_model.device))
                     p_x_shadow_model = self.get_probability_from_model_output(logit, y)
                     temp.append(p_x_shadow_model)
             p_x_given_different_thetas_list_no_members.append(temp)
@@ -244,12 +246,12 @@ class AttackRMIA(AttackAbstract):
         p_x_given_target_list_no_members: List[float] = []
         for x, y in iter(member_dataloader):
             with torch.no_grad():
-                logit = self.target_model.forward(x)
+                logit = self.target_model.forward(x.to(self.target_model.device))
                 p_x_target_model = self.get_probability_from_model_output(logit, y)
                 p_x_given_target_list_members.append(p_x_target_model)
         for x, y in iter(no_member_dataloader):
             with torch.no_grad():
-                logit = self.target_model.forward(x)
+                logit = self.target_model.forward(x.to(self.target_model.device))
                 p_x_target_model = self.get_probability_from_model_output(logit, y)
                 p_x_given_target_list_no_members.append(p_x_target_model)
 
@@ -269,20 +271,42 @@ class AttackRMIA(AttackAbstract):
                     p_x_no_members = 0.5*((self.offline_a + 1) * p_x_no_members + (1-self.offline_a))
 
         # compute ratios for x
-        ratio_x_members = p_x_given_target_members / p_x_members # (N,)
+        ratio_x_members = p_x_given_target_members / p_x_members # (X,)
         ratio_x_no_members = p_x_given_target_no_members / p_x_no_members
 
         # compute scores
         # members
-        ratio_x_members_reshaped = ratio_x_members[:, np.newaxis] # (N,1)
-        likelihood_members = ratio_x_members_reshaped / self.ratio_z # (N,N) will be broadcasted
-        score_members = np.mean(likelihood_members > self.gamma, axis=1) # (N,)
+        ratio_x_members_reshaped = ratio_x_members[:, np.newaxis] # (X,1)
+        likelihood_members = ratio_x_members_reshaped / self.ratio_z # (X,Z) will be broadcasted
+        score_members = np.mean(likelihood_members > self.gamma, axis=1) # (X,)
         # no members
-        ratio_x_no_members_reshaped = ratio_x_no_members[:, np.newaxis] # (N,1)
-        likelihood_no_members = ratio_x_no_members_reshaped / self.ratio_z # (N,N) will be broadcasted
-        score_no_members = np.mean(likelihood_no_members > self.gamma, axis=1) # (N,)
+        ratio_x_no_members_reshaped = ratio_x_no_members[:, np.newaxis] # (X,1)
+        likelihood_no_members = ratio_x_no_members_reshaped / self.ratio_z # (X,Z) will be broadcasted
+        score_no_members = np.mean(likelihood_no_members > self.gamma, axis=1) # (X,)
 
+        # Creating thresholds for comparison
+        thresholds = np.linspace(1/likelihood_members.shape[1], 1, 1000)
 
+        # Predicting membership
+        member_preds = np.greater(score_members[:, np.newaxis], thresholds).T
+        non_member_preds = np.greater(score_no_members[:, np.newaxis], thresholds).T
+
+        # Concatenating predictions and setting true labels
+        predictions = np.concatenate([member_preds, non_member_preds], axis=1)
+        true_labels = np.concatenate(
+            [np.ones(len(score_members)), np.zeros(len(score_no_members))]
+        )
+        signal_values = np.concatenate(
+            [score_members, score_no_members]
+        )
+
+        # Compute ROC, TP, TN, etc.
+        return CombinedMetricResult(
+            predicted_labels=predictions,
+            true_labels=true_labels,
+            predictions_proba=None,
+            signal_values=signal_values,
+        )
 
         # # get the logits for the audit dataset
         # audit_data = get_dataset_subset(self.population, self.audit_dataset["data"])
@@ -303,45 +327,45 @@ class AttackRMIA(AttackAbstract):
         # # evaluate the marginal p_out(x) by averaging the output of the shadow models
         # p_x_out = np.mean(p_x_given_shadow_models, axis=0) if len(self.shadow_models) > 1 else p_x_given_shadow_models.squeeze()
 
-        # compute the marginal p(x) from P_out and p_in where p_in = a*p_out+b
-        p_x = 0.5*((self.offline_a + 1) * p_x_out + (1-self.offline_a))
+        # # compute the marginal p(x) from P_out and p_in where p_in = a*p_out+b
+        # p_x = 0.5*((self.offline_a + 1) * p_x_out + (1-self.offline_a))
 
-        # compute the ratio of p(x|theta) to p(x)
-        ratio_x = p_x_given_theta / (p_x + self.epsilon)
+        # # compute the ratio of p(x|theta) to p(x)
+        # ratio_x = p_x_given_theta / (p_x + self.epsilon)
 
-        # for each x, compare it with the ratio of all z points
-        likelihoods = ratio_x.T / self.ratio_z
-        score = np.mean(likelihoods > self.gamma, axis=1)
+        # # for each x, compare it with the ratio of all z points
+        # likelihoods = ratio_x.T / self.ratio_z
+        # score = np.mean(likelihoods > self.gamma, axis=1)
 
-        # pick out the in-members and out-members signals
-        self.in_member_signals = score[self.audit_dataset["in_members"]].reshape(-1,1)
-        self.out_member_signals = score[self.audit_dataset["out_members"]].reshape(-1,1)
+        # # pick out the in-members and out-members signals
+        # self.in_member_signals = score[self.audit_dataset["in_members"]].reshape(-1,1)
+        # self.out_member_signals = score[self.audit_dataset["out_members"]].reshape(-1,1)
 
-        thresholds = np.linspace(1/likelihoods.shape[1], 1, 1000)
+        # thresholds = np.linspace(1/likelihoods.shape[1], 1, 1000)
 
 
-        member_preds = np.greater(self.in_member_signals, thresholds).T
-        non_member_preds = np.greater(self.out_member_signals, thresholds).T
+        # member_preds = np.greater(self.in_member_signals, thresholds).T
+        # non_member_preds = np.greater(self.out_member_signals, thresholds).T
 
-        # what does the attack predict on test and train dataset
-        predictions = np.concatenate([member_preds, non_member_preds], axis=1)
-        # set true labels for being in the training dataset
-        true_labels = np.concatenate(
-            [
-                np.ones(len(self.in_member_signals)),
-                np.zeros(len(self.out_member_signals)),
-            ]
-        )
-        signal_values = np.concatenate(
-            [self.in_member_signals, self.out_member_signals]
-        )
+        # # what does the attack predict on test and train dataset
+        # predictions = np.concatenate([member_preds, non_member_preds], axis=1)
+        # # set true labels for being in the training dataset
+        # true_labels = np.concatenate(
+        #     [
+        #         np.ones(len(self.in_member_signals)),
+        #         np.zeros(len(self.out_member_signals)),
+        #     ]
+        # )
+        # signal_values = np.concatenate(
+        #     [self.in_member_signals, self.out_member_signals]
+        # )
 
-        # compute ROC, TP, TN etc
-        return CombinedMetricResult(
-            predicted_labels=predictions,
-            true_labels=true_labels,
-            predictions_proba=None,
-            signal_values=signal_values,
-        )
+        # # compute ROC, TP, TN etc
+        # return CombinedMetricResult(
+        #     predicted_labels=predictions,
+        #     true_labels=true_labels,
+        #     predictions_proba=None,
+        #     signal_values=signal_values,
+        # )
 
 
