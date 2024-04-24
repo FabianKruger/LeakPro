@@ -99,12 +99,11 @@ class AttackObjects:
                     self._shadow_models.append(shadow_model)
                     number_of_files_to_reuse -= 1
                 else:
-                    shadow_model = self._target_model_class(configs["LightningModule"]["hparams"])
                     self._data_module.usecase = "general_distribution"
+                    shadow_model = self._target_model_class(**configs["LightningModule"]["hparams"])
                     # for random subsamples of the dataset change configs["audit"]["f_attack_data_size"]
-                    shadow_model = self._target_model_class(configs["LightningModule"])
                     shadow_model = self.train_lightning_shadow_model(shadow_model, self._data_module, dir_shadow_models=path_shadow_models, file_name=f"model_{k}")
-                self._shadow_models.append(shadow_model)
+                    self._shadow_models.append(shadow_model)
 
 
 
@@ -167,11 +166,12 @@ class AttackObjects:
         # instantiate trainer
         trainer = L.Trainer(
             logger=False,
+            max_epochs=100,
             enable_checkpointing=True,
             accelerator="auto",
             callbacks=[checkpoint_callback, early_stopping_callback],
         )
 
         trainer.fit(model=shadow_model, datamodule=data_module)
-        shadow_model.load_from_checkpoint(checkpoint_callback.best_model_path)
-        return shadow_model
+        trained_shadow_model = self._target_model_class.load_from_checkpoint(checkpoint_callback.best_model_path)
+        return trained_shadow_model
