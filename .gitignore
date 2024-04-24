@@ -164,3 +164,7 @@ cython_debug/
 
 # trained models
 /trained_models/
+
+# results
+ames_morgan_fingerprint/
+ames_graph/
