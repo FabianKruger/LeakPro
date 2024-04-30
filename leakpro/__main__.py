@@ -11,12 +11,14 @@ import yaml
 
 from leakpro.mia_attacks.attack_scheduler import AttackScheduler
 from leakpro.reporting.utils import prepare_priavcy_risk_report
+from leakpro.adapters.utils import get_config_from_moreno_result_folder
 
 from leakpro.adapters.ames_data_module import AmesDataModule
-from inference_attacks_on_molecules.models.MPNN import MPNNLightning
-from inference_attacks_on_molecules.models.MLP import MLPLightningModel
+from moreno.models.MPNN import MPNNLightning
+from moreno.models.MLP import MLPLightningModel
 
-def setup_log(name: str, save_file: bool) -> logging.Logger:
+
+def setup_log(name: str, save_file: bool, directory: str = '.') -> logging.Logger:
     """Generate the logger for the current run.
 
     Args:
@@ -40,7 +42,7 @@ def setup_log(name: str, save_file: bool) -> logging.Logger:
     my_logger.addHandler(console_handler)
 
     if save_file:
-        filename = f"log_{name}.log"
+        filename = f"{directory}/log_{name}.log"
         log_handler = logging.FileHandler(filename, mode="w")
         log_handler.setLevel(logging.INFO)
         log_handler.setFormatter(log_format)
@@ -51,29 +53,33 @@ def setup_log(name: str, save_file: bool) -> logging.Logger:
 
 if __name__ == "__main__":
 
-    RETRAIN = True
-    #args = "./config/adult.yaml"  # noqa: ERA001
-    args = "./config/custom_config.yml" # noqa: ERA001
-    with open(args, "rb") as f:
+    path_of_this_file = Path(__file__).resolve()
+    parent_directory = path_of_this_file.parent.parent
+    config_path = str(parent_directory / "config" / "custom_config.yml")
+    with open(config_path, "rb") as f:
         configs = yaml.safe_load(f)
+
+    # autofill configuration for my use case
+    if configs["moreno_result_folder"]["folder_path"] is not None:
+        configs = get_config_from_moreno_result_folder(configs)
 
     # Set the random seed, log_dir and inference_game
     torch.manual_seed(configs["run"]["random_seed"])
     np.random.seed(configs["run"]["random_seed"])
     random.seed(configs["run"]["random_seed"])
 
-    # Setup logger
     log_dir = configs["run"]["log_dir"]
-    logger = setup_log("time_analysis", configs["run"]["time_log"])
 
     Path(log_dir).mkdir(parents=True, exist_ok=True)
     report_dir = f"{log_dir}/{configs['audit']['report_log']}"
     Path(report_dir).mkdir(parents=True, exist_ok=True)
 
+    # Setup logger
+    logger = setup_log("time_analysis", configs["run"]["time_log"], directory=log_dir)
     start_time = time.time()
 
     # ------------------------------------------------
-    # Create the population dataset
+    # Prepare some variables
 
     data_module = AmesDataModule(configs)
     data_module.setup(stage="fit")
@@ -93,21 +99,7 @@ if __name__ == "__main__":
 
     # ------------------------------------------------
     # LEAKPRO starts here
-    # Read in model, population, and metadata
-    # data_dir = configs["data"]["data_dir"]
-    # data_file = configs["data"]["dataset"]
-    # dataset_path = f"{data_dir}/{data_file}.pkl"
-    # with open(dataset_path, "rb") as file:
-    #     population = joblib.load(file)
 
-
-    # Get the target model + metadata
-    
-
-    # ------------------------------------------------
-    # Now we have the target model, its metadata, and the train/test dataset
-    # indices.
-    # TODO: add lightning datamodule and lightning module
     attack_scheduler = AttackScheduler(
         data_module,
         model_class,
@@ -115,7 +107,7 @@ if __name__ == "__main__":
         configs,
         log_dir,
         logger,
-    )  # TODO metadata includes indices for train and test data
+    ) 
     audit_results = attack_scheduler.run_attacks()
 
     logger.info(str(audit_results["rmia"]["result_object"]))
