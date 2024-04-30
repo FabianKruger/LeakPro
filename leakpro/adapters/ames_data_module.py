@@ -7,7 +7,8 @@ import torch
 import rdkit
 from rdkit import Chem
 from rdkit.Chem import rdFingerprintGenerator
-from inference_attacks_on_molecules.data_modules.datasets_and_collate_functions import GraphDataset, mol_collate_fn
+from rdkit.Chem.rdMolDescriptors import GetMACCSKeysFingerprint
+from moreno.data_modules.datasets_and_collate_functions import GraphDataset, mol_collate_fn
 from leakpro.adapters.custom_data_module import CustomDataModule
 
 class AmesDataModule(CustomDataModule):
@@ -62,21 +63,24 @@ class AmesDataModule(CustomDataModule):
     
 
     def convert_dataset(self, data: pd.DataFrame) -> Dataset:
-        """Converting a pandas dataframe to a pytorch tensor dataset with the smiles represented as what is specified in self.representation
+        """Converting a pandas dataframe to a pytorch tensor dataset with the smiles represented as what is specified in self.datamodule_configs["representation"]
 
         Args:
             data (pd.DataFrame): Dataframe with smiles and label columns
 
         Raises:
-            NotImplementedError: Transforming smiles to representation specified in self.representation is not implemented
+            NotImplementedError: Transforming smiles to representation specified in self.datamodule_configs["representation"] is not implemented
 
         Returns:
-            Dataset: pytorch dataset with smiles represented as what is specified in self.representation
+            Dataset: pytorch dataset with smiles represented as what is specified in self.datamodule_configs["representation"]
         """
         labels = data["label"].to_numpy()
-        if self.datamodule_configs["representation"] == "Morgan fingerprint":
+        if self.datamodule_configs["representation"] == "ECFP_4" or self.datamodule_configs["representation"] == "ECFP_6":
             molecules = [Chem.MolFromSmiles(smiles) for smiles in data["smiles"]]
-            mfpgen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
+            if self.datamodule_configs["representation"] == "ECFP_4":
+                mfpgen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
+            else: 
+                mfpgen = rdFingerprintGenerator.GetMorganGenerator(radius=3, fpSize=2048)
             self.input_vec_dim = 2048
             features = np.array(
                 [mfpgen.GetFingerprintAsNumPy(molecule) for molecule in molecules]
@@ -84,6 +88,13 @@ class AmesDataModule(CustomDataModule):
             features_tensor = torch.tensor(features, dtype=torch.float)
             labels_tensor = torch.tensor(labels, dtype=torch.float)
             dataset = TensorDataset(features_tensor, labels_tensor)
+        elif self.datamodule_configs["representation"] == "MACCS":
+            molecules = [Chem.MolFromSmiles(smiles) for smiles in data["smiles"]]
+            maccs_keys = np.array([GetMACCSKeysFingerprint(mol) for mol in molecules])
+            maccs_tensor = torch.tensor(maccs_keys, dtype=torch.float)
+            labels_tensor = torch.tensor(labels, dtype=torch.float)
+            self.input_vec_dim = 167
+            dataset = TensorDataset(maccs_tensor, labels_tensor)
         elif self.datamodule_configs["representation"] == "graph":
             molecules = [[Chem.MolFromSmiles(smiles)] for smiles in data["smiles"]] # chemprop wants mols as list of list with len(outer list) = number datapoints
             dataset = GraphDataset(molecules=molecules, labels=labels)
@@ -115,7 +126,7 @@ class AmesDataModule(CustomDataModule):
         return DataLoader(
             self.validation_dataset,
             batch_size=self.datamodule_configs["batch_size"],
-            shuffle=True,
+            shuffle=False,
             num_workers=self.datamodule_configs["num_workers"],
             prefetch_factor=self.datamodule_configs["prefetch_factor"],
             collate_fn=collate_function,
@@ -130,7 +141,7 @@ class AmesDataModule(CustomDataModule):
         return DataLoader(
             self.test_dataset,
             batch_size=self.datamodule_configs["batch_size"],
-            shuffle=True,
+            shuffle=False,
             num_workers=self.datamodule_configs["num_workers"],
             prefetch_factor=self.datamodule_configs["prefetch_factor"],
             collate_fn=collate_function,
