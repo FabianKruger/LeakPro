@@ -1,6 +1,7 @@
 """Contains the AttackResult class, which stores the results of an attack."""
 
 import numpy as np
+from numpy.typing import NDArray
 from sklearn.metrics import (
     accuracy_score,
     auc,
@@ -129,3 +130,11 @@ class CombinedMetricResult:
 
             txt_list.append("\n".join(txt))
         return "\n\n".join(txt_list)
+
+
+class CustomResults:
+
+    def __init__(self, y_pred: NDArray[np.float64], y_true: NDArray[np.float64]) -> None:
+        self.y_pred = y_pred
+        self.y_true = y_true
+
