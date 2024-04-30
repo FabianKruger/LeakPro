@@ -1,5 +1,5 @@
 """Utility functions for generating privacy risk report."""
-
+from typing import Optional
 from leakpro.import_helper import List
 from leakpro.reporting import audit_report
 from leakpro.reporting.audit_report import (
@@ -12,7 +12,7 @@ def prepare_priavcy_risk_report(
     log_dir: str,
     audit_results: List,
     configs: dict,
-    save_path: str = None,
+    save_path: Optional[str] = None,
 ) -> None:
     """Generate privacy risk report based on the auditing report.
 
