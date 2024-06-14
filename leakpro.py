@@ -22,8 +22,9 @@ from leakpro.dev_utils.data_preparation import (
     prepare_train_test_datasets,
 )
 from leakpro.reporting.utils import prepare_priavcy_risk_report
-from leakpro.user_inputs.cifar10_input_handler import Cifar10InputHandler
+from leakpro.user_inputs.moreno_input_handler import MorenoInputHandler
 
+import argparse
 
 def setup_log(name: str, save_file: bool=True) -> logging.Logger:
     """Generate the logger for the current run.
@@ -95,23 +96,40 @@ def generate_user_input(configs: dict, logger: logging.Logger)->None:
 
 if __name__ == "__main__":
 
-    user_args = "./config/dev_config/cinic10.yaml" # noqa: ERA001
+    # user_args = "./config/dev_config/cinic10.yaml" # noqa: ERA001
 
-    with open(user_args, "rb") as f:
-        user_configs = yaml.safe_load(f)
+    # with open(user_args, "rb") as f:
+    #     user_configs = yaml.safe_load(f)
 
     # Setup logger
     logger = setup_log("LeakPro", save_file=True)
 
-    # Generate user input
-    generate_user_input(user_configs, logger) # This is for developing purposes only
+    # # Generate user input
+    # generate_user_input(user_configs, logger) # This is for developing purposes only
 
     start_time = time.time()
     # ------------------------------------------------
     # LEAKPRO starts here
-    args = "./config/audit.yaml" # noqa: ERA001
+    args = "./config/moreno_audit.yaml" # noqa: ERA001
     with open(args, "rb") as f:
         configs = yaml.safe_load(f)
+
+    # generate configs parameters from cli input
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--representation", type=str)
+    parser.add_argument("--hyperparameters_path", type=str)
+    parser.add_argument("--model_path", type=str)
+    parser.add_argument("--train_data_path", type=str)
+    parser.add_argument("--test_data_path", type=str)
+    args = parser.parse_args()
+
+    configs["moreno"]["representation"] = args.representation
+    configs["moreno"]["hyperparameters_path"] = args.hyperparameters_path
+    configs["moreno"]["model_path"] = args.model_path
+    configs["data"]["train_data_path"] = args.train_data_path
+    configs["data"]["test_data_path"] = args.test_data_path
+
 
     # Set the random seed, log_dir and inference_game
     manual_seed(configs["audit"]["random_seed"])
@@ -123,7 +141,7 @@ if __name__ == "__main__":
     Path(report_dir).mkdir(parents=True, exist_ok=True)
 
     # Create user input handler
-    handler = Cifar10InputHandler(configs=configs, logger=logger)
+    handler = MorenoInputHandler(configs=configs, logger=logger)
 
     attack_scheduler = AttackScheduler(handler)
     audit_results = attack_scheduler.run_attacks()
@@ -142,5 +160,5 @@ if __name__ == "__main__":
     os.makedirs(config_log_path, exist_ok=True)
     with open(f"{config_log_path}/audit.yaml", "w") as f:
         yaml.safe_dump(configs, f)
-    with open(f"{config_log_path}/user_config.yaml", "w") as f:
-        yaml.safe_dump(user_configs, f)
+    # with open(f"{config_log_path}/user_config.yaml", "w") as f:
+    #     yaml.safe_dump(user_configs, f)
