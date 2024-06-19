@@ -122,6 +122,8 @@ if __name__ == "__main__":
     parser.add_argument("--model_path", type=str)
     parser.add_argument("--train_data_path", type=str)
     parser.add_argument("--test_data_path", type=str)
+    parser.add_argument("--output_path", type=str)
+    parser.add_argument("--shadow_model_storage_path", type=str)
     args = parser.parse_args()
 
     configs["moreno"]["representation"] = args.representation
@@ -129,6 +131,9 @@ if __name__ == "__main__":
     configs["moreno"]["model_path"] = args.model_path
     configs["data"]["train_data_path"] = args.train_data_path
     configs["data"]["test_data_path"] = args.test_data_path
+    configs["shadow_model"]["storage_path"] = args.shadow_model_storage_path
+    configs["audit"]["report_log"] = args.output_path
+    configs["audit"]["config_log"] = str(Path(args.output_path) / "configs")
 
 
     # Set the random seed, log_dir and inference_game
