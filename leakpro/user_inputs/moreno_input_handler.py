@@ -21,6 +21,7 @@ import numpy as np
 import yaml 
 from typing import Optional, Dict, Any, Tuple, List, Type
 import lightning as L 
+from moreno.config import Config
 
 class MorenoInputHandler(AbstractInputHandler):
     
@@ -49,7 +50,7 @@ class MorenoInputHandler(AbstractInputHandler):
 
         train_dataset, self.input_vec_dim = convert_dataset(data= train_data, representation= self.configs["moreno"]["representation"])
         test_dataset, _ = convert_dataset(data = test_data, representation= self.configs["moreno"]["representation"])
-
+        # will be initialzed properly later. Dont think the indexing works as intended otherwise with Subsets
         self.population = ConcatDataset([train_dataset, test_dataset])
         # Convert datasets to lists
         train_inputs_list, train_labels_list = self._dataset_to_list(train_dataset)
@@ -74,19 +75,22 @@ class MorenoInputHandler(AbstractInputHandler):
         for i, tensor in enumerate(test_labels_list):
             test_labels[i] = tensor
 
-        # # Convert lists to numpy arrays
-        # train_inputs = np.array(train_inputs_list, dtype=object)
-        # train_labels = np.array(train_labels_list, dtype=object)
-        # test_inputs = np.array(test_inputs_list, dtype=object)
-        # test_labels = np.array(test_labels_list, dtype=object)
+
+        # set the class imbalance
+        num_pos = sum([(tensor == 1).sum().item() for tensor in test_labels])
+        num_neg = sum([(tensor == 0).sum().item() for tensor in test_labels])
+        Config.set_pos_weights(torch.tensor([(num_neg / num_pos)]))
 
         # Concatenate the numpy arrays
         self.inputs = np.concatenate((train_inputs, test_inputs), axis=0)
         self.labels = np.concatenate((train_labels, test_labels), axis=0)
 
+        # Create population
+        self.population = self.get_dataset(np.arange(len(train_data)+len(test_data)))
+
         # Create numpy arrays for the indices
         self._target_model_metadata["train_indices"] = np.arange(len(train_data))
-        self._target_model_metadata["test_indices"] = np.arange(len(train_data), len(train_data) + len(test_data))
+        self._target_model_metadata["test_indices"] = np.arange(len(train_data), int(len(train_data) + 0.5*len(test_data)))
     
     def _load_model_class(self: Self) -> None:
         pass
