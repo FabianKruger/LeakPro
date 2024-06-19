@@ -9,6 +9,7 @@ from tqdm import tqdm
 from leakpro.dataset import Dataset
 from leakpro.import_helper import List, Self, Tuple
 from leakpro.model import Model
+import torch
 
 ########################################################################################################################
 # SIGNAL CLASS
@@ -82,14 +83,18 @@ class ModelLogits(Signal):
         for model in models:
             # Initialize a list to store the logits for the current model
             model_logits = []
+            device = next(model.model_obj.parameters()).device
 
             # Iterate over the dataset using the DataLoader (ensures we use transforms etc)
-            data_loader = DataLoader(datasets, batch_size=len(datasets), shuffle=False)
-            for data, _ in data_loader:
-                # Get logits for each data point
-                logits = model.get_logits(data)
-                model_logits.extend(logits)
-            model_logits = np.array(model_logits)
+            with torch.no_grad():
+                data_loader = DataLoader(datasets, batch_size=64, shuffle=False)
+                for data, _ in data_loader:
+                    # Get logits for each data point
+                    if isinstance(data, torch.Tensor):
+                        data = data.to(device)
+                    logits = model.get_logits(data)
+                    model_logits.extend(logits)
+                model_logits = np.array(model_logits)
             # Append the logits for the current model to the results
             results.append(model_logits)
 
