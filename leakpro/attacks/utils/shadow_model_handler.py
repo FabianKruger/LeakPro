@@ -130,6 +130,7 @@ class ShadowModelHandler(ModelHandler):
 
         # Get the size of the dataset
         data_size = int(len(shadow_population)*training_fraction)
+        # TODO: add unique identifier
         all_indices, filtered_indices = self._filter(data_size, online)
 
         # Create a list of indices to use for the new shadow models
@@ -154,7 +155,7 @@ class ShadowModelHandler(ModelHandler):
             model, criterion, optimizer = self._get_model_criterion_optimizer()
 
             # Train shadow model
-            self.logger.info(f"Training shadow model {i} on {len(data_loader)} points")
+            self.logger.info(f"Training shadow model {i} on {len(data_loader)} points") # TODO: logs wrong info. I think this gives the amount of batches not the amount of points
             training_results = self.handler.train(data_loader, model, criterion, optimizer, self.epochs)
             # Read out results
             shadow_model = training_results["model"]
@@ -168,7 +169,10 @@ class ShadowModelHandler(ModelHandler):
 
             self.logger.info(f"Storing metadata for shadow model {i}")
             meta_data = {}
-            meta_data["init_params"] = self.init_params
+            if hasattr(shadow_model, 'hparams'):
+                meta_data["init_params"] = shadow_model.hparams
+            else:
+                meta_data["init_params"] = self.init_params
             meta_data["train_indices"] = data_indices
             meta_data["num_train"] = len(data_indices)
             meta_data["optimizer"] = optimizer.__class__.__name__
@@ -201,7 +205,8 @@ class ShadowModelHandler(ModelHandler):
             raise ValueError("Index cannot be negative")
         if index >= len(os.listdir(self.storage_path)):
             raise ValueError("Index out of range")
-
+        metadata = self._load_shadow_metadata(index)
+        self.init_params = metadata["init_params"]
         model_path = f"{self.storage_path}/{self.model_storage_name}_{index}.pkl"
         shadow_model, criterion = self._load_model(model_path)
         return PytorchModel(shadow_model, criterion)
