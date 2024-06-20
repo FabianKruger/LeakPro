@@ -25,7 +25,7 @@ class AbstractInputHandler(ABC):
         self.target_model = None
         self.target_model_metadata = None
         self.population = None
-
+        self._target_model_metadata = {}
         self.setup()
 
         # User-defined attributes
@@ -153,7 +153,7 @@ class AbstractInputHandler(ABC):
             raise ValueError("Failed to create an instance of the shadow model.") from e
 
     @abstractmethod
-    def get_criterion(self:Self, criterion: torch.nn.modules.loss._Loss) -> None:
+    def get_criterion(self:Self, criterion: torch.nn.modules.loss._Loss) -> None: # TODO: wrong?
         """Get the loss function for the target model to be used in shadow model training."""
         pass
 
@@ -168,7 +168,8 @@ class AbstractInputHandler(ABC):
         dataloader: DataLoader,
         model: torch.nn.Module,
         criterion: torch.nn.modules.loss._Loss,
-        optimizer: torch.optim.Optimizer
+        optimizer: torch.optim.Optimizer,
+        epochs: int,
     ) -> nn.Module:
         """Procedure to train the shadow models on data from the population."""
         pass
