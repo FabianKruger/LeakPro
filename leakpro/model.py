@@ -5,6 +5,7 @@ from copy import deepcopy
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from leakpro.import_helper import Callable, List, Self
 
@@ -259,6 +260,16 @@ class PytorchModel(Model):
                 The rescaled logit value.
 
             """
+
+            def logit(p):
+                return torch.log(p / (1 - p + 1e-45))
+
+            def rescaled_logits(model_output, y_true):
+                p = torch.sigmoid(model_output)    
+                p_adjusted = torch.where(y_true == 1, p, 1 - p)       
+                phi_p = logit(p_adjusted)          
+                return phi_p
+            
             self.batch_size = 1024
 
             device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -274,19 +285,13 @@ class PytorchModel(Model):
                     x = x.to(device)  # noqa: PLW2901
                     y = y.to(device)  # noqa: PLW2901
                     all_logits = self.model_obj(x)
+                    if all_logits.dim() > 1:
+                        all_logits = all_logits.squeeze()
+                    if all_logits.dim() == 0:
+                        all_logits = all_logits.unsqueeze(0)
+                    rescaled_output = rescaled_logits(all_logits.squeeze(), y)
+                    rescaled_list.append(torch.flatten(rescaled_output).cpu().numpy())
 
-                    predictions = all_logits - torch.max(all_logits, dim=1, keepdim=True).values
-                    predictions = torch.exp(predictions)
-                    predictions = predictions/torch.sum(predictions,dim=1, keepdim=True)
-
-                    count = predictions.shape[0]
-                    y_true = predictions[np.arange(count), y.type(torch.IntTensor)]
-                    predictions[np.arange(count), y.type(torch.IntTensor)] = 0
-
-                    y_wrong = torch.sum(predictions, dim=1)
-                    output_signals = torch.flatten(torch.log(y_true+1e-45) - torch.log(y_wrong+1e-45)).cpu().numpy()
-
-                    rescaled_list.append(output_signals)
                 all_rescaled_logits = np.concatenate(rescaled_list)
             self.model_obj.to("cpu")
             return all_rescaled_logits
