@@ -10,6 +10,7 @@ from leakpro.dataset import Dataset
 from leakpro.import_helper import List, Self, Tuple
 from leakpro.model import Model
 import torch
+from leakpro.user_inputs.abstract_input_handler import AbstractInputHandler
 
 ########################################################################################################################
 # SIGNAL CLASS
@@ -25,6 +26,7 @@ class Signal(ABC):
         models: List[Model],
         datasets: List[Dataset],
         extra: dict,
+        handler: AbstractInputHandler,
     ):
         """Built-in call method.
 
@@ -65,6 +67,7 @@ class ModelLogits(Signal):
         self: Self,
         models: List[Model],
         datasets: Dataset,
+        handler: AbstractInputHandler,
     ) -> List[np.ndarray]:
         """Built-in call method.
 
@@ -80,14 +83,14 @@ class ModelLogits(Signal):
 
         """        # Compute the signal for each model
         results = []
-        for model in models:
+        for model in tqdm(models):
             # Initialize a list to store the logits for the current model
             model_logits = []
             device = next(model.model_obj.parameters()).device
 
             # Iterate over the dataset using the DataLoader (ensures we use transforms etc)
             with torch.no_grad():
-                data_loader = DataLoader(datasets, batch_size=64, shuffle=False)
+                data_loader = handler.get_dataloader_from_dataset(datasets)
                 for data, _ in data_loader:
                     # Get logits for each data point
                     if isinstance(data, torch.Tensor):
@@ -128,6 +131,7 @@ class ModelNegativeRescaledLogits(Signal):
             The signal value.
 
         """
+        # TODO: adapt to use handler
         data_loader = DataLoader(datasets, batch_size=len(datasets), shuffle=False)
 
         # Iterate over the dataset using the DataLoader (ensures we use transforms etc)
@@ -160,6 +164,7 @@ class ModelRescaledLogits(Signal):
         self: Self,
         models: List[Model],
         datasets: Dataset,
+        handler: AbstractInputHandler,
     ) -> List[np.ndarray]:
         """Built-in call method.
 
@@ -173,24 +178,12 @@ class ModelRescaledLogits(Signal):
             The signal value.
 
         """
-        data_loader = DataLoader(datasets, batch_size=len(datasets), shuffle=False)
-
-        # Iterate over the dataset using the DataLoader (ensures we use transforms etc)
-        for data, labels in data_loader:
-
-            # Initialize a list to store the logits for the current model
-            model_logits = []
-            for model in tqdm(models):
-
-                # Get rescaled logits for each data point
-                logits = model.get_rescaled_logits(data, labels)
-
-                # Append the logits for the current model to the results
-                model_logits.append(logits)
-
-            model_logits = np.array(model_logits)
+        model_logits= []
+        for model in tqdm(models):
+            logits = model.get_rescaled_logits(datasets, handler)
+            model_logits.append(logits)
+        model_logits = np.array(model_logits)
         return model_logits
-
 
 ########################################################################################################################
 # MODEL_INTERMEDIATE_OUTPUT CLASS
