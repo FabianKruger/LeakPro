@@ -6,8 +6,10 @@ from copy import deepcopy
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch.utils.data import Dataset
 
 from leakpro.import_helper import Callable, List, Self
+from leakpro.user_inputs.abstract_input_handler import AbstractInputHandler
 
 ########################################################################################################################
 # MODEL CLASS
@@ -140,10 +142,15 @@ class PytorchModel(Model):
             Model output.
 
         """
-        if not isinstance(batch_samples, torch.Tensor):
-            batch_samples = torch.tensor(
-                np.array(batch_samples), dtype=torch.float32
-            )
+        # if not isinstance(batch_samples, torch.Tensor):
+        #     batch_samples = torch.tensor(
+        #         np.array(batch_samples), dtype=torch.float32
+        #     )
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.model_obj.to(device)
+        self.model_obj.eval()
+        if isinstance(batch_samples, torch.Tensor):
+            batch_samples = batch_samples.to(device)
         return self.model_obj(batch_samples).detach().cpu().numpy()
 
     def get_loss(self:Self, batch_samples:np.ndarray, batch_labels:np.ndarray, per_point:bool=True)->np.ndarray:
@@ -247,7 +254,7 @@ class PytorchModel(Model):
 
         return hook
 
-    def get_rescaled_logits(self:Self, batch_samples:np.ndarray, batch_labels:np.ndarray) -> np.ndarray:
+    def get_rescaled_logits(self:Self, dataset: Dataset, handler: AbstractInputHandler) -> np.ndarray:
             """Get the rescaled logits of the model on a given input and expected output.
 
             Args:
@@ -262,7 +269,7 @@ class PytorchModel(Model):
             """
 
             def logit(p):
-                return torch.log(p / (1 - p + 1e-45))
+                return torch.log((p +1e-7) / (1 - p + 1e-7))
 
             def rescaled_logits(model_output, y_true):
                 p = torch.sigmoid(model_output)    
@@ -270,28 +277,47 @@ class PytorchModel(Model):
                 phi_p = logit(p_adjusted)          
                 return phi_p
             
-            self.batch_size = 1024
 
             device = "cuda:0" if torch.cuda.is_available() else "cpu"
             self.model_obj.to(device)
             self.model_obj.eval()
 
             with torch.no_grad():
+                dataloader = handler.get_dataloader_from_dataset(dataset)
                 rescaled_list = []
-                batched_samples = torch.split(torch.tensor(np.array(batch_samples), dtype=torch.float32), self.batch_size)
-                batched_labels = torch.split(torch.tensor(np.array(batch_labels), dtype=torch.float32), self.batch_size)
-
-                for x, y in zip(batched_samples, batched_labels):
-                    x = x.to(device)  # noqa: PLW2901
-                    y = y.to(device)  # noqa: PLW2901
+                for x, y in dataloader:
+                    if isinstance(x, torch.Tensor):
+                        x = x.to(device)  # noqa: PLW2901
+                    if isinstance(y, torch.Tensor):
+                        y = y.to(device)  # noqa: PLW2901
                     all_logits = self.model_obj(x)
                     if all_logits.dim() > 1:
                         all_logits = all_logits.squeeze()
                     if all_logits.dim() == 0:
                         all_logits = all_logits.unsqueeze(0)
-                    rescaled_output = rescaled_logits(all_logits.squeeze(), y)
+                    rescaled_output = rescaled_logits(all_logits, y)
                     rescaled_list.append(torch.flatten(rescaled_output).cpu().numpy())
 
                 all_rescaled_logits = np.concatenate(rescaled_list)
             self.model_obj.to("cpu")
-            return all_rescaled_logits
+            return all_rescaled_logits                
+
+            # with torch.no_grad():
+            #     rescaled_list = []
+            #     batched_samples = torch.split(torch.tensor(np.array(batch_samples), dtype=torch.float32), self.batch_size)
+            #     batched_labels = torch.split(torch.tensor(np.array(batch_labels), dtype=torch.float32), self.batch_size)
+            #     # TODO: split input and labels. Use handler.get_dataloader_from_dataset, device management
+            #     for x, y in zip(batched_samples, batched_labels):
+            #         x = x.to(device)  # noqa: PLW2901
+            #         y = y.to(device)  # noqa: PLW2901
+            #         all_logits = self.model_obj(x)
+            #         if all_logits.dim() > 1:
+            #             all_logits = all_logits.squeeze()
+            #         if all_logits.dim() == 0:
+            #             all_logits = all_logits.unsqueeze(0)
+            #         rescaled_output = rescaled_logits(all_logits.squeeze(), y)
+            #         rescaled_list.append(torch.flatten(rescaled_output).cpu().numpy())
+
+            #     all_rescaled_logits = np.concatenate(rescaled_list)
+            # self.model_obj.to("cpu")
+            # return all_rescaled_logits
