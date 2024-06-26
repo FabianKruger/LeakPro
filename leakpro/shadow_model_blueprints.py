@@ -2,7 +2,6 @@
 
 from torch import Tensor, flatten, nn
 from torch.nn import Module, functional
-from torchvision.models import resnet18
 
 from leakpro.import_helper import Self
 

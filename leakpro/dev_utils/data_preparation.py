@@ -10,10 +10,8 @@ from urllib.request import urlretrieve
 import joblib
 import numpy as np
 import pandas as pd
-import torchvision
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
-from torchvision import transforms
 
 from leakpro.dataset import GeneralDataset
 
