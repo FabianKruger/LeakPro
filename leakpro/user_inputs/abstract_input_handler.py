@@ -7,7 +7,7 @@ import joblib
 import numpy as np
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
 from leakpro.import_helper import Self, Tuple
 from leakpro.utils.input_handler import get_class_from_module, import_module_from_file
@@ -138,7 +138,10 @@ class AbstractInputHandler(ABC):
     def get_dataloader(self: Self, dataset_indices: np.ndarray, batch_size: int = 32) -> DataLoader:
         """Default implementation of the dataloader."""
         dataset = self.get_dataset(dataset_indices)
-        return DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
+        return DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True) # TODO: ask Johan if shuffle makes sense here
+    
+    def get_dataloader_from_dataset(self: Self, dataset: Dataset):
+        return DataLoader(dataset=dataset, batch_size=32, shuffle=False)
 
     #------------------------------------------------
     # Methods related to target model
