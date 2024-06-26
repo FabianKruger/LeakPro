@@ -148,7 +148,34 @@ class MorenoInputHandler(AbstractInputHandler):
             collate_fn = CNN_collate_fn
         else:
             collate_fn = None
-        return DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)    
+        return DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)    
+    
+    def get_dataset_from_numpy_arrays(self: Self, inputs: np.ndarray, labels: np.ndarray):
+        if isinstance(inputs, (np.ndarray, torch.Tensor)):
+            inputs = inputs.flatten()
+            labels = labels.flatten()
+        if self.configs["moreno"]["representation"] == "graph":
+            if isinstance(inputs, (np.ndarray, torch.Tensor)):
+                inputs = inputs.tolist()
+            dataset = GraphDataset(inputs, labels)
+        elif self.configs["moreno"]["representation"] == "transformer_matrix":
+            if isinstance(inputs, (np.ndarray, torch.Tensor)):
+                inputs = inputs.tolist()
+            dataset = CNNDataset(inputs, labels)
+        else:
+            inputs_tensor = torch.stack(inputs.tolist())
+            labels_tensor = torch.stack(labels.tolist())
+            dataset = TensorDataset(inputs_tensor, labels_tensor)
+        return dataset        
+    
+    def get_dataloader_from_dataset(self: Self, dataset: Dataset):
+        if self.configs["moreno"]["representation"] == "graph":
+            collate_fn = mol_collate_fn
+        elif self.configs["moreno"]["representation"] == "transformer_matrix":
+            collate_fn = CNN_collate_fn
+        else:
+            collate_fn = None
+        return DataLoader(dataset=dataset, batch_size=64, shuffle=False, collate_fn=collate_fn)  
     
     def get_target_replica(self: Self) -> Tuple[torch.nn.Module, nn.modules.loss._Loss, torch.optim.Optimizer]:
         # TODO: Probably wont work since it return a lightning Module instead
