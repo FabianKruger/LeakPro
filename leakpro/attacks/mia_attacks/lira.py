@@ -137,11 +137,11 @@ class AttackLiRA(AbstractMIA):
 
         # Calculate logits for all shadow models
         self.logger.info(f"Calculating the logits for all {self.num_shadow_models} shadow models")
-        self.shadow_models_logits = np.swapaxes(np.array(self.signal(self.shadow_models, self.audit_data)), 0, 1)
+        self.shadow_models_logits = np.swapaxes(np.array(self.signal(self.shadow_models, self.audit_data, handler=self.handler)), 0, 1)
 
         # Calculate logits for the target model
         self.logger.info("Calculating the logits for the target model")
-        self.target_logits = np.array(self.signal([self.target_model], self.audit_data)).squeeze()
+        self.target_logits = np.array(self.signal([self.target_model], self.audit_data, handler=self.handler)).squeeze()
 
     def run_attack(self:Self) -> CombinedMetricResult:
         """Runs the attack on the target model and dataset and assess privacy risks or data leakage.
@@ -162,7 +162,7 @@ class AttackLiRA(AbstractMIA):
         if self.fixed_variance:
             out_std = np.std(self.shadow_models_logits[~self.in_indices_mask].flatten())
             if self.online:
-                in_std = np.nanstd(self.shadow_models_logits[self.in_indices_mask].flatten())
+                in_std = np.std(self.shadow_models_logits[self.in_indices_mask].flatten())
 
         # Iterate and extract logits from shadow models for each sample in the audit dataset
         for i, (shadow_models_logits, mask) in tqdm(enumerate(zip(self.shadow_models_logits, self.in_indices_mask)),
@@ -172,7 +172,7 @@ class AttackLiRA(AbstractMIA):
             # Calculate the mean for OUT shadow model logits
             out_mean = np.mean(shadow_models_logits[~mask])
             if not self.fixed_variance:
-                    out_std = np.std(shadow_models_logits[~mask])
+                out_std = np.std(shadow_models_logits[~mask])
 
             # Get the logit from the target model for the current sample
             target_logit = self.target_logits[i]
