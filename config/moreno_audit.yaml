@@ -3,6 +3,11 @@ audit:  # Configurations for auditing
   report_log: "./leakpro_output/results"  # Folder to save the auditing report TODO: make this a sys argument instead or make a script to generate the audit files
   config_log: "./leakpro_output/config"  # Folder to save the configuration files
   attack_list:
+    lira:
+      training_data_fraction: 0.5 # Fraction of the auxilary dataset to use for this attack (in each shadow model training)
+      num_shadow_models: 10 # Number of shadow models to train
+      online: True # perform online or offline attack
+      fixed_variance: True
     rmia:
       training_data_fraction: 0.5  # Fraction of the auxilary dataset to use for this attack (in each shadow model training)
       attack_data_fraction: 1 # Fraction of auxiliary dataset to sample from during attack
@@ -11,7 +16,7 @@ audit:  # Configurations for auditing
   attack_type: "mia"
 
 shadow_model:
-  storage_path: "./leakpro_shadow_models/" # TODO: make this a cli feature instead
+  storage_path: none
 
 distillation_model: # Why do I need this??
   storage_path: "./leakpro_distillation_models/"
