@@ -52,7 +52,9 @@ class MorenoInputHandler(AbstractInputHandler):
         test_dataset, _ = convert_dataset(data = test_data, representation= self.configs["moreno"]["representation"])
         # will be initialzed properly later. Dont think the indexing works as intended otherwise with Subsets
         self.population = ConcatDataset([train_dataset, test_dataset])
-        # Convert datasets to lists
+
+        # Converting dataset to numpy arrays holding objects
+        # Convert datasets to lists (necessary to make sure dtype is correct)
         train_inputs_list, train_labels_list = self._dataset_to_list(train_dataset)
         test_inputs_list, test_labels_list = self._dataset_to_list(test_dataset)
 
@@ -63,14 +65,14 @@ class MorenoInputHandler(AbstractInputHandler):
         test_labels = np.empty(len(test_labels_list), dtype=object)
 
         # Populate the object arrays with tensors
-        for i, tensor in enumerate(train_inputs_list):
-            train_inputs[i] = tensor
+        for i, obj in enumerate(train_inputs_list):
+            train_inputs[i] = obj
 
         for i, tensor in enumerate(train_labels_list):
             train_labels[i] = tensor
 
-        for i, tensor in enumerate(test_inputs_list):
-            test_inputs[i] = tensor
+        for i, obj in enumerate(test_inputs_list):
+            test_inputs[i] = obj
 
         for i, tensor in enumerate(test_labels_list):
             test_labels[i] = tensor
@@ -122,7 +124,6 @@ class MorenoInputHandler(AbstractInputHandler):
         self.lightning_model = lightning_model
 
     def get_dataset(self: Self, dataset_indices: np.ndarray) -> Dataset:
-        # TODO
         # I assume that dataset_indices are just an array of numbers here and not an array of len(population) with true or false values
         self._validate_indices(dataset_indices)
         inputs_subset = self.inputs[dataset_indices]
