@@ -134,7 +134,10 @@ if __name__ == "__main__":
     configs["shadow_model"]["storage_path"] = args.shadow_model_storage_path
     configs["audit"]["report_log"] = args.output_path
     configs["audit"]["config_log"] = str(Path(args.output_path) / "configs")
-
+    # define these for later train data extraction
+    configs["audit"]["attack_list"]["rmia"]["train_data_path"] = args.train_data_path
+    configs["audit"]["attack_list"]["rmia"]["representation"] = args.representation
+    configs["audit"]["attack_list"]["rmia"]["report_log"] = args.output_path
 
     # Set the random seed, log_dir and inference_game
     manual_seed(configs["audit"]["random_seed"])
