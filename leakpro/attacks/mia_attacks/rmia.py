@@ -8,6 +8,7 @@ from leakpro.import_helper import Self
 from leakpro.metrics.attack_result import CombinedMetricResult
 from leakpro.signals.signal import ModelLogits
 from leakpro.user_inputs.abstract_input_handler import AbstractInputHandler
+from leakpro.utils.extract_true_positives import write_true_positives_to_disc, compare_datasets
 from torch.utils.data import Subset
 
 class AttackRMIA(AbstractMIA):
@@ -32,6 +33,7 @@ class AttackRMIA(AbstractMIA):
         self.epsilon = 1e-6
         self.shadow_models = None
         self.shadow_model_indices = None
+        self.configs = configs
 
         self.logger.info("Configuring RMIA attack")
         self._configure_attack(configs)
@@ -190,6 +192,8 @@ class AttackRMIA(AbstractMIA):
         # give a numpy array of all the correct labels instead
         # TODO: ask Johan if this works with shuffle = True
         audit_data = self.handler.get_dataset(self.audit_dataset["data"])
+        compare_datasets(audit_data, self.configs)
+        # TODO: load csv, convert to ECFP_4 and compare if it is the same as audit_data for the training dataset indices
         labels_list = []
         for _, labels in audit_data:
             labels_list.append(labels.item())
@@ -281,6 +285,19 @@ class AttackRMIA(AbstractMIA):
         self.in_member_signals = score[in_members].reshape(-1,1)
         self.out_member_signals = score[out_members].reshape(-1,1)
 
+
+        signal_values = np.concatenate(
+            [self.in_member_signals, self.out_member_signals]
+        )
+
+        true_labels = np.concatenate(
+            [
+                np.ones(len(self.in_member_signals)),
+                np.zeros(len(self.out_member_signals)),
+            ]
+        )   
+        write_true_positives_to_disc(dataset = audit_data, scores= signal_values, labels=true_labels, mask=mask, configs=self.configs)
+
     def _offline_attack(self:Self) -> None:
         self.logger.info("Running RMIA offline attack")
         # get the logits for the audit dataset
@@ -357,6 +374,7 @@ class AttackRMIA(AbstractMIA):
         signal_values = np.concatenate(
             [self.in_member_signals, self.out_member_signals]
         )
+
 
         # compute ROC, TP, TN etc
         return CombinedMetricResult(
