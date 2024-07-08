@@ -122,11 +122,26 @@ class AttackRMIA(AbstractMIA):
                 true_label_indices:np.ndarray) -> np.ndarray:
         """Compute the sigmoid function for binary classification with one output node."""
         # apply sigmoid function
-        def sigmoid(x):
-            return 1 / (1 + np.exp(-x))
-        prob_class_1 = sigmoid(all_logits)
+        prob_class_1 = self.sigmoid(all_logits)
         p_x_given_model = np.where(true_label_indices==1, prob_class_1, 1-prob_class_1)
         return p_x_given_model
+    
+    def sigmoid(self, x):
+        # Create a mask for positive and negative values
+        positive_mask = x >= 0
+        negative_mask = ~positive_mask
+        
+        # Initialize the result array with the same shape as x
+        result = np.zeros_like(x, dtype=np.float64)
+        
+        # Apply the numerically stable sigmoid for positive values
+        result[positive_mask] = 1. / (1. + np.exp(-x[positive_mask]))
+        
+        # Apply the numerically stable sigmoid for negative values
+        exp_x = np.exp(x[negative_mask])
+        result[negative_mask] = exp_x / (1. + exp_x)
+        
+        return result
     
     def prepare_attack(self:Self) -> None:
         """Prepare data needed for running the attack on the target model and dataset.
@@ -296,7 +311,7 @@ class AttackRMIA(AbstractMIA):
                 np.zeros(len(self.out_member_signals)),
             ]
         )   
-        write_true_positives_to_disc(dataset = audit_data, scores= signal_values, labels=true_labels, mask=mask, configs=self.configs)
+        write_true_positives_to_disc(dataset = audit_data, scores= signal_values, labels=true_labels, mask=mask, configs=self.configs, attack = "rmia")
 
     def _offline_attack(self:Self) -> None:
         self.logger.info("Running RMIA offline attack")
