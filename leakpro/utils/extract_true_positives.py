@@ -12,7 +12,7 @@ import os
 # `scores` is a numpy array containing the model scores
 # `labels` is a numpy array containing the true labels
 
-def write_true_positives_to_disc(dataset: Dataset, scores: np.ndarray, labels: np.ndarray, mask: np.ndarray, configs: Dict):
+def write_true_positives_to_disc(dataset: Dataset, scores: np.ndarray, labels: np.ndarray, mask: np.ndarray, configs: Dict, attack: str):
 
     # sanity check
     compare_datasets(dataset, configs=configs, mask= mask)
@@ -55,7 +55,7 @@ def write_true_positives_to_disc(dataset: Dataset, scores: np.ndarray, labels: n
     })
 
     # Save the DataFrame to a CSV file
-    output_path = configs["report_log"] + "/true_positives/rmia.csv"
+    output_path = configs["report_log"] + f"/true_positives/{attack}.csv"
     os.makedirs((configs["report_log"] + "/true_positives/"), exist_ok=True)
     sample_df.to_csv(output_path, index=False)
 
