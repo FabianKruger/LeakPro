@@ -12,11 +12,17 @@ import os
 # `scores` is a numpy array containing the model scores
 # `labels` is a numpy array containing the true labels
 
-def write_true_positives_to_disc(dataset: Dataset, scores: np.ndarray, labels: np.ndarray, mask: np.ndarray, configs: Dict, attack: str):
+def write_true_positives_to_disc(dataset: Dataset, scores: np.ndarray, labels: np.ndarray, mask: np.ndarray, configs: Dict, attack: str, higher_score_class_1: bool = True):
 
     # sanity check
     compare_datasets(dataset, configs=configs, mask= mask)
     scores = scores.squeeze()
+
+    original_scores = scores.copy()
+
+    if not higher_score_class_1:
+        scores = -scores
+    
     # Calculate the ROC curve
     fpr, tpr, thresholds = roc_curve(labels, scores)
 
@@ -48,7 +54,7 @@ def write_true_positives_to_disc(dataset: Dataset, scores: np.ndarray, labels: n
     property_label = true_positive_originals["label"]
     # Create a DataFrame with the relevant information
     sample_df = pd.DataFrame({
-        "scores": scores[true_positive_indices], 
+        "scores": original_scores[true_positive_indices], 
         "samples": true_positive_samples, 
         "molecules": molecules,
         "property_label": property_label
