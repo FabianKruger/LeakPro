@@ -11,6 +11,7 @@ from leakpro.metrics.attack_result import CombinedMetricResult
 from leakpro.signals.signal import ModelRescaledLogits
 from leakpro.user_inputs.abstract_input_handler import AbstractInputHandler
 from leakpro.utils.extract_true_positives import write_true_positives_to_disc
+from torch.utils.data import Subset
 
 class AttackLiRA(AbstractMIA):
     """Implementation of the LiRA attack."""
@@ -135,6 +136,12 @@ class AttackLiRA(AbstractMIA):
             if len(self.audit_data) == np.sum(self.skip_indices):
                 raise ValueError("All audit samples are skipped. Please adjust the number of shadow models or the audit dataset.")
 
+        self.relevant_indices = np.where(~self.skip_indices)[0]
+        self.audit_data = Subset(self.audit_data, self.relevant_indices)
+        new_number_in_members = np.sum(~self.skip_indices[:len(self.audit_dataset["in_members"])])
+        self.audit_dataset["in_members"] = np.arange(0, new_number_in_members)
+        self.audit_dataset["out_members"] = np.arange(new_number_in_members, len(self.audit_data))
+        self.in_indices_mask = self.in_indices_mask[~self.skip_indices]
         # Calculate logits for all shadow models
         self.logger.info(f"Calculating the logits for all {self.num_shadow_models} shadow models")
         self.shadow_models_logits = np.swapaxes(np.array(self.signal(self.shadow_models, self.audit_data, handler=self.handler)), 0, 1)
@@ -192,16 +199,12 @@ class AttackLiRA(AbstractMIA):
             score.append(pr_in - pr_out)  # Append the calculated probability density value to the score list
 
         score = np.asarray(score)  # Convert the list of scores to a numpy array
-        nan_mask = ~np.isnan(score) # false at nan positions
-        non_nan_dataset_indices = np.where(nan_mask)[0]
-        filtered_dataset = self.handler.get_dataset(non_nan_dataset_indices)
-        score_filtered=score[nan_mask]
+
         # Generate thresholds based on the range of computed scores for decision boundaries
-        self.thresholds = np.linspace(np.min(score_filtered), np.max(score_filtered), 1000)
-        n_in_members = len(self.audit_dataset["in_members"])
+        self.thresholds = np.linspace(np.min(score), np.max(score), 1000)
         # Split the score array into two parts based on membership: in (training) and out (non-training)
-        self.in_member_signals = score[self.audit_dataset["in_members"][nan_mask[:n_in_members]]].reshape(-1,1)  # Scores for known training data members
-        self.out_member_signals = score[self.audit_dataset["out_members"][nan_mask[n_in_members:]]].reshape(-1,1)  # Scores for non-training data members
+        self.in_member_signals = score[self.audit_dataset["in_members"]].reshape(-1,1)  # Scores for known training data members
+        self.out_member_signals = score[self.audit_dataset["out_members"]].reshape(-1,1)  # Scores for non-training data members
 
         # Create prediction matrices by comparing each score against all thresholds
         member_preds = np.less(self.in_member_signals, self.thresholds).T  # Predictions for training data members
@@ -218,7 +221,7 @@ class AttackLiRA(AbstractMIA):
         # Combine all signal values for further analysis
         signal_values = np.concatenate([self.in_member_signals, self.out_member_signals])
 
-        write_true_positives_to_disc(dataset=filtered_dataset, scores=signal_values, labels=true_labels, mask=nan_mask, configs=self.configs, attack = "lira")
+        write_true_positives_to_disc(dataset=self.audit_data, scores=signal_values, labels=true_labels, mask=~self.skip_indices, configs=self.configs, attack = "lira", higher_score_class_1 = False)
 
         # Return a result object containing predictions, true labels, and the signal values for further evaluation
         return CombinedMetricResult(
