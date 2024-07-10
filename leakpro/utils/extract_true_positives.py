@@ -14,7 +14,7 @@ import os
 
 def write_true_positives_to_disc(dataset: Dataset, scores: np.ndarray, labels: np.ndarray, mask: np.ndarray, configs: Dict, attack: str, higher_score_class_1: bool = True):
 
-    # sanity check
+    # sanity check, turn off for performance
     compare_datasets(dataset, configs=configs, mask= mask)
     scores = scores.squeeze()
 
@@ -55,7 +55,7 @@ def write_true_positives_to_disc(dataset: Dataset, scores: np.ndarray, labels: n
     # Create a DataFrame with the relevant information
     sample_df = pd.DataFrame({
         "scores": original_scores[true_positive_indices], 
-        "samples": true_positive_samples, 
+    #   "samples": true_positive_samples, 
         "molecules": molecules,
         "property_label": property_label
     })
@@ -74,7 +74,7 @@ def compare_datasets(dataset: Dataset, configs: Dict, mask = None):
         mask = mask[:len(df)]
         df = df[mask]
     file_dataset, _ = convert_dataset(df, rep)
-    # check for the first 10 indices to make sure we didnt mess up the order
+    # check for the indices to make sure we didnt mess up the order
     for idx in range(len(file_dataset)):
         sample_original = file_dataset[idx]
         sample_input = dataset[idx]
