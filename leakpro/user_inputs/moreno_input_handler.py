@@ -120,6 +120,7 @@ class MorenoInputHandler(AbstractInputHandler):
             self._target_model_blueprint = CNNLightning
         else:
             raise ValueError(f"Unknown representation {self.configs['moreno']['representation']}")
+        lightning_model.eval()
         self.target_model = lightning_model.model
         self.lightning_model = lightning_model
 
@@ -215,6 +216,7 @@ class MorenoInputHandler(AbstractInputHandler):
             )
         
         trainer.fit(model, dataloader)
+        model.eval()
         # return will not work for CNN, see above
         return {"model": model,
                 "metrics": {"accuracy": None, "loss": None}}
