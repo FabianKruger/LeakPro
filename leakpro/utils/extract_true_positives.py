@@ -83,10 +83,18 @@ def compare_datasets(dataset: Dataset, configs: Dict, mask = None):
                 assert torch.allclose(o, i), f"Mismatch at index {idx}"
             elif isinstance(o, str) and isinstance(i, str):
                 assert o == i, f"Mismatch at index {idx}"
-            elif isinstance(o, Chem.Mol) and isinstance(i, Chem.Mol):
-                smiles1 = Chem.MolToSmiles(o)
-                smiles2 = Chem.MolToSmiles(i)
-                assert smiles1 == smiles2, f"Mismatch at index {idx}"
+            elif isinstance(o, list) and isinstance(i, list):
+                # Ensure we only process non-empty lists
+                while isinstance(o, list) and len(o) > 0:
+                    o = o[0]
+                while isinstance(i, list) and len(i) > 0:
+                    i = i[0]
+                if isinstance(o, Chem.Mol) and isinstance(i, Chem.Mol):
+                    smiles1 = Chem.MolToSmiles(o)
+                    smiles2 = Chem.MolToSmiles(i)
+                    assert smiles1 == smiles2, f"Mismatch at index {idx}"
+                else:
+                    assert o == i, f"Mismatch at index {idx}"
             else:
                 assert o == i, f"Mismatch at index {idx}"
 
